@@ -2,297 +2,72 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
 <title>Chef Dashboard - Kitchen Order System</title>
 
 <style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fb; }
 
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #f5f7fb;
-}
+.header { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 16px 24px; position: sticky; top: 0; z-index: 100; }
+.header-content { display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto; }
+.logo { font-size: 1.4rem; font-weight: bold; }
+.logo span { color: #ffd700; }
+.header-buttons { display: flex; gap: 10px; }
+.refresh-btn { background: rgba(255,255,255,0.2); border: none; padding: 8px 16px; border-radius: 25px; color: white; font-weight: 600; cursor: pointer; }
+.logout-btn { background: rgba(255,255,255,0.2); border: none; padding: 8px 20px; border-radius: 25px; color: white; font-weight: 600; cursor: pointer; }
 
-.header {
-    background: linear-gradient(135deg, #1e3c72, #2a5298);
-    color: white;
-    padding: 16px 24px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-}
+.kitchen-tabs { background: white; padding: 0 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); position: sticky; top: 70px; z-index: 99; overflow-x: auto; white-space: nowrap; }
+.tabs-container { max-width: 1400px; margin: 0 auto; display: flex; gap: 8px; padding: 12px 0; }
+.tab-btn { padding: 12px 24px; background: #f0f2f5; border: none; border-radius: 30px; font-weight: 600; cursor: pointer; transition: all 0.3s; font-size: 14px; white-space: nowrap; }
+.tab-btn:hover { background: #e0e0e0; transform: translateY(-2px); }
+.tab-btn.active { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; }
 
-.header-content {
-    display: flex;
- justify-content: space-between;
-    align-items: center;
-    max-width: 1400px;
-    margin: 0 auto;
-}
+.container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+.kitchen-page { display: none; }
+.kitchen-page.active-page { display: block; }
+.card { background: white; border-radius: 16px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.card h3 { font-size: 1.2rem; margin-bottom: 18px; color: #1e3c72; border-left: 4px solid #3498db; padding-left: 12px; }
 
-.logo {
-    font-size: 1.4rem;
-    font-weight: bold;
-}
+.input-group { margin-bottom: 16px; }
+.input-group label { display: block; font-size: 0.75rem; font-weight: 600; color: #555; margin-bottom: 6px; text-transform: uppercase; }
+.required { color: #e74c3c; margin-left: 4px; }
+.error-message { color: #e74c3c; font-size: 12px; margin-top: 5px; }
 
-.logo span {
-    color: #ffd700;
-}
+select, input { width: 100%; padding: 12px 16px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; background: white; }
+select:focus, input:focus { outline: none; border-color: #3498db; }
 
-.logout-btn {
-    background: rgba(255,255,255,0.2);
-    border: none;
-    padding: 8px 20px;
-    border-radius: 25px;
-    color: white;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.kitchen-tabs {
-    background: white;
-    padding: 0 24px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    position: sticky;
-    top: 70px;
-    z-index: 99;
-    overflow-x: auto;
-    white-space: nowrap;
-}
-
-.tabs-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    display: flex;
-    gap: 8px;
-    padding: 12px 0;
-}
-
-.tab-btn {
-    padding: 12px 24px;
-    background: #f0f2f5;
-    border: none;
-    border-radius: 30px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s;
-    font-size: 14px;
-    white-space: nowrap;
-}
-
-.tab-btn:hover {
-    background: #e0e0e0;
-    transform: translateY(-2px);
-}
-
-.tab-btn.active {
-    background: linear-gradient(135deg, #1e3c72, #2a5298);
-    color: white;
-}
-
-.container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 24px;
-}
-
-.kitchen-page {
-    display: none;
-}
-
-.kitchen-page.active-page {
-    display: block;
-}
-
-.card {
-    background: white;
-    border-radius: 16px;
-    padding: 24px;
-    margin-bottom: 24px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-}
-
-.card h3 {
-    font-size: 1.2rem;
-    margin-bottom: 18px;
-    color: #1e3c72;
-    border-left: 4px solid #3498db;
-    padding-left: 12px;
-}
-
-.input-group {
-    margin-bottom: 16px;
-}
-
-.input-group label {
-    display: block;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #555;
-    margin-bottom: 6px;
-    text-transform: uppercase;
-}
-
-.required {
-    color: #e74c3c;
-    margin-left: 4px;
-}
-
-.error-message {
-    color: #e74c3c;
-    font-size: 12px;
-    margin-top: 5px;
-}
-
-select, input {
-    width: 100%;
-    padding: 12px 16px;
-    border: 1px solid #ddd;
-    border-radius: 10px;
-    font-size: 16px;
-    background: white;
-}
-
-select:focus, input:focus {
-    outline: none;
-    border-color: #3498db;
-}
-
-.btn {
-    padding: 12px 24px;
-    border: none;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 14px;
-}
-
-.btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-
+.btn { padding: 12px 24px; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: 14px; }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
 .btn-primary { background: #3498db; color: white; }
 .btn-success { background: #27ae60; color: white; }
-.btn-warning { background: #f39c12; color: white; }
 .btn-danger { background: #e74c3c; color: white; }
 
-table {
-    width: 100%;
-    border-collapse: collapse;
-}
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+th { background: #f8f9fa; font-weight: 600; color: #555; }
+.remove-btn { background: #fee2e2; border: none; padding: 6px 14px; border-radius: 20px; color: #e74c3c; font-weight: 600; cursor: pointer; }
 
-th, td {
-    padding: 12px;
-    text-align: left;
-    border-bottom: 1px solid #eee;
-}
-
-th {
-    background: #f8f9fa;
-    font-weight: 600;
-    color: #555;
-}
-
-.remove-btn {
-    background: #fee2e2;
-    border: none;
-    padding: 6px 14px;
-    border-radius: 20px;
-    color: #e74c3c;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.status-badge {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
+.status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
 .status-pending { background: #f39c12; color: white; }
 .status-approved { background: #27ae60; color: white; }
 .status-rejected { background: #e74c3c; color: white; }
-.status-partial { background: #8e44ad; color: white; }
 
-.cart-stats {
-    background: #e8f4fd;
-    padding: 12px 16px;
-    border-radius: 10px;
-    margin-bottom: 16px;
-    display: flex;
-    justify-content: space-between;
-    font-weight: 500;
-}
+.cart-stats { background: #e8f4fd; padding: 12px 16px; border-radius: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; font-weight: 500; }
+.empty-state { text-align: center; padding: 40px; color: #999; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 24px; border-radius: 30px; font-size: 14px; z-index: 1000; animation: slideUp 0.3s ease; }
+@keyframes slideUp { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 
-.empty-state {
-    text-align: center;
-    padding: 40px;
-    color: #999;
-}
-
-.toast {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #333;
-    color: white;
-    padding: 12px 24px;
-    border-radius: 30px;
-    font-size: 14px;
-    z-index: 1000;
-    animation: slideUp 0.3s ease;
-}
-
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateX(-50%) translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-    }
-}
-
-.button-group {
-    display: flex;
-    gap: 12px;
-    margin-top: 16px;
-    flex-wrap: wrap;
-}
+.button-group { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.sync-status { font-size: 12px; text-align: right; margin-top: 10px; padding: 5px 10px; border-radius: 10px; display: inline-block; float: right; }
 
 @media screen and (min-width: 769px) {
-    .search-add-row {
-        display: flex;
-        gap: 12px;
-        align-items: flex-end;
-    }
-    .search-add-row .input-group {
-        flex: 1;
-        margin-bottom: 0;
-    }
-    .admin-fab {
-        position: fixed;
-        bottom: 30px;
-        right: 30px;
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        color: white;
-        border: none;
-        padding: 14px 28px;
-        border-radius: 40px;
-        font-weight: bold;
-        cursor: pointer;
-        z-index: 99;
-    }
+    .search-add-row { display: flex; gap: 12px; align-items: flex-end; }
+    .search-add-row .input-group { flex: 1; margin-bottom: 0; }
+    .admin-fab { position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; padding: 14px 28px; border-radius: 40px; font-weight: bold; cursor: pointer; z-index: 99; }
     .admin-btn-mobile { display: none; }
 }
 
@@ -302,77 +77,29 @@ th {
     .btn { width: 100%; }
     .button-group { flex-direction: column; }
     .admin-fab { display: none; }
-    .admin-btn-mobile {
-        display: block;
-        width: 100%;
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        color: white;
-        border: none;
-        padding: 14px;
-        border-radius: 30px;
-        font-weight: bold;
-        margin-top: 16px;
-        cursor: pointer;
-    }
+    .admin-btn-mobile { display: block; width: 100%; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; padding: 14px; border-radius: 30px; font-weight: bold; margin-top: 16px; cursor: pointer; }
     .table-wrapper { overflow-x: auto; }
     .cart-table { min-width: 500px; }
     .kitchen-tabs { padding: 0 16px; }
+    .header-buttons { gap: 8px; }
+    .refresh-btn, .logout-btn { padding: 6px 12px; font-size: 12px; }
 }
 
-.request-item {
-    background: #f8f9fa;
-    border-radius: 14px;
-    padding: 14px;
-    margin-bottom: 10px;
-    border-left: 4px solid;
-}
-
+.request-item { background: #f8f9fa; border-radius: 14px; padding: 14px; margin-bottom: 10px; border-left: 4px solid; }
 .request-item.pending { border-left-color: #f39c12; }
 .request-item.approved { border-left-color: #27ae60; }
 .request-item.rejected { border-left-color: #e74c3c; }
-
-.request-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
+.request-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .request-id { font-weight: bold; font-size: 0.85rem; }
 .request-date { font-size: 0.7rem; color: #888; margin: 6px 0; }
 
 .mobile-cards-view { display: none; }
+@media screen and (max-width: 768px) { .desktop-table-view { display: none; } .mobile-cards-view { display: block; } }
+@media screen and (min-width: 769px) { .desktop-table-view { display: block; } .mobile-cards-view { display: none; } }
 
-@media screen and (max-width: 768px) {
-    .desktop-table-view { display: none; }
-    .mobile-cards-view { display: block; }
-}
-
-@media screen and (min-width: 769px) {
-    .desktop-table-view { display: block; }
-    .mobile-cards-view { display: none; }
-}
-
-.approved-items-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-}
-
-.approved-items-table th {
-    background: #e8f4fd;
-    padding: 8px;
-    font-size: 0.75rem;
-    text-align: left;
-}
-
-.approved-items-table td {
-    padding: 8px;
-    font-size: 0.8rem;
-    border-bottom: 1px solid #f0f0f0;
-}
+.approved-items-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.approved-items-table th { background: #e8f4fd; padding: 8px; font-size: 0.75rem; text-align: left; }
+.approved-items-table td { padding: 8px; font-size: 0.8rem; border-bottom: 1px solid #f0f0f0; }
 </style>
 </head>
 <body>
@@ -380,7 +107,10 @@ th {
 <div class="header">
     <div class="header-content">
         <div class="logo">🍳 Kitchen Order <span>| Chef Dashboard</span></div>
-        <button class="logout-btn" onclick="logout()">🚪 Logout</button>
+        <div class="header-buttons">
+            <button class="refresh-btn" onclick="manualRefresh()">🔄 Refresh</button>
+            <button class="logout-btn" onclick="logout()">🚪 Logout</button>
+        </div>
     </div>
 </div>
 
@@ -400,6 +130,7 @@ th {
 
 <button class="admin-btn-mobile" onclick="openAdmin()">👑 Open Admin Panel</button>
 <button class="admin-fab" onclick="openAdmin()">👑 Admin Panel</button>
+<div class="sync-status" id="syncStatus">🔄 Connecting to cloud...</div>
 
 <script>
 // ========================
@@ -432,30 +163,54 @@ const allItems = [
 
 let currentKitchen = "Hot Kitchen";
 let kitchenData = {};
-
+let allRequests = [];
 const kitchens = ["Hot Kitchen", "Cold Kitchen", "Pastry", "Butchery", "Beach House", "Nihon Kitchen", "Staff Kitchen"];
 
-kitchens.forEach(kitchen => {
-    kitchenData[kitchen] = { cart: [], chefName: "" };
-});
+kitchens.forEach(kitchen => { kitchenData[kitchen] = { cart: [], chefName: "" }; });
 
-function getAllRequests() {
-    let requests = localStorage.getItem("kitchen_requests");
-    if(!requests) {
-        localStorage.setItem("kitchen_requests", JSON.stringify([]));
-        return [];
+// ============ FIREBASE FUNCTIONS ============
+
+async function loadRequestsFromFirebase() {
+    try {
+        const snapshot = await db.collection("kitchen_requests").orderBy("timestamp", "desc").get();
+        allRequests = [];
+        snapshot.forEach(doc => { allRequests.push({ firebaseId: doc.id, ...doc.data() }); });
+        console.log("✅ Loaded:", allRequests.length, "requests");
+        if (currentKitchen) loadMyRequests(currentKitchen);
+        document.getElementById("syncStatus").innerHTML = "✅ Connected • " + allRequests.length + " orders";
+        document.getElementById("syncStatus").style.background = "#e8f5e9";
+        document.getElementById("syncStatus").style.color = "#27ae60";
+    } catch (error) {
+        console.error("Firebase error:", error);
+        document.getElementById("syncStatus").innerHTML = "⚠️ Offline mode";
+        document.getElementById("syncStatus").style.background = "#fee2e2";
+        document.getElementById("syncStatus").style.color = "#e74c3c";
     }
-    return JSON.parse(requests);
 }
 
-function saveAllRequests(requests) {
-    localStorage.setItem("kitchen_requests", JSON.stringify(requests));
-    console.log("Saved requests:", requests.length);
+async function saveRequestToFirebase(request) {
+    try {
+        await db.collection("kitchen_requests").add(request);
+        showToast("✅ Request saved to cloud!");
+        await loadRequestsFromFirebase();
+    } catch (error) {
+        console.error("Save error:", error);
+        showToast("❌ Error saving to cloud");
+    }
 }
 
-function getItemsForKitchen(kitchen) {
-    return allItems.filter(i => i.section === kitchen);
+async function manualRefresh() {
+    showToast("🔄 Refreshing...");
+    await loadRequestsFromFirebase();
+    if (currentKitchen) {
+        loadMyRequests(currentKitchen);
+        renderCart(currentKitchen);
+    }
 }
+
+// ============ HELPER FUNCTIONS ============
+
+function getItemsForKitchen(kitchen) { return allItems.filter(i => i.section === kitchen); }
 
 function loadItems(kitchen) {
     const kitchenId = kitchen.replace(/\s/g, '_');
@@ -463,23 +218,13 @@ function loadItems(kitchen) {
     const select = document.getElementById(`itemSelect_${kitchenId}`);
     const search = document.getElementById(`searchItem_${kitchenId}`).value.toLowerCase();
     
-    if(!chefName) {
-        select.innerHTML = "<option>Please enter chef name first</option>";
-        return;
-    }
+    if(!chefName) { select.innerHTML = "<option>Enter chef name first</option>"; return; }
     
     let items = getItemsForKitchen(kitchen);
     let filtered = search ? items.filter(i => i.name.toLowerCase().includes(search) || i.code.toLowerCase().includes(search)) : items;
-    
     select.innerHTML = "";
-    if(filtered.length === 0) {
-        select.innerHTML = "<option>No items found</option>";
-        return;
-    }
-    
-    filtered.forEach(i => {
-        select.innerHTML += `<option value="${i.code}">${i.code} - ${i.name} (${i.unit}) - Max: ${i.maxLimit}</option>`;
-    });
+    if(filtered.length === 0) { select.innerHTML = "<option>No items found</option>"; return; }
+    filtered.forEach(i => { select.innerHTML += `<option value="${i.code}">${i.code} - ${i.name} (${i.unit}) - Max: ${i.maxLimit}</option>`; });
 }
 
 function filterItems(kitchen) { loadItems(kitchen); }
@@ -499,7 +244,7 @@ function addItem(kitchen) {
     const code = document.getElementById(`itemSelect_${kitchenId}`).value;
     const qty = parseFloat(document.getElementById(`qty_${kitchenId}`).value);
     
-    if(!code || code === "No items found" || code === "Please enter chef name first") {
+    if(!code || code === "No items found" || code === "Enter chef name first") {
         showToast("Please select an item");
         return;
     }
@@ -509,7 +254,7 @@ function addItem(kitchen) {
     if(!item) return;
     
     if(qty > item.maxLimit) {
-        showToast(`⚠️ Cannot order more than ${item.maxLimit} ${item.unit}`);
+        showToast(`⚠️ Max ${item.maxLimit} ${item.unit}`);
         return;
     }
     
@@ -573,7 +318,7 @@ function clearCart(kitchen) {
     }
 }
 
-function submitRequest(kitchen) {
+async function submitRequest(kitchen) {
     const kitchenId = kitchen.replace(/\s/g, '_');
     const chefName = document.getElementById(`chefName_${kitchenId}`).value.trim();
     const cart = kitchenData[kitchen].cart;
@@ -588,10 +333,8 @@ function submitRequest(kitchen) {
         return;
     }
     
-    const requests = getAllRequests();
     const newRequest = {
-        id: Date.now(),
-        requestId: "REQ-" + (Date.now()).toString().slice(-6),
+        requestId: "REQ-" + Date.now().toString().slice(-6),
         chefName: chefName,
         section: kitchen,
         items: cart.map(i => ({
@@ -603,14 +346,10 @@ function submitRequest(kitchen) {
         timestamp: Date.now()
     };
     
-    requests.push(newRequest);
-    saveAllRequests(requests);
-    showToast(`✅ Request ${newRequest.requestId} submitted to admin!`);
-    console.log("Request submitted:", newRequest);
-    
+    await saveRequestToFirebase(newRequest);
     kitchenData[kitchen].cart = [];
     renderCart(kitchen);
-    loadMyRequests(kitchen);
+    showToast(`✅ Request ${newRequest.requestId} submitted!`);
 }
 
 function getOverallStatus(items) {
@@ -629,10 +368,9 @@ function loadMyRequests(kitchen) {
         return;
     }
     
-    const requests = getAllRequests();
-    const myRequests = requests.filter(r => r.chefName === chefName && r.section === kitchen);
-    
+    const myRequests = allRequests.filter(r => r.chefName === chefName && r.section === kitchen);
     const container = document.getElementById(`myRequestsDesktop_${kitchenId}`);
+    
     if(myRequests.length === 0) {
         container.innerHTML = '<div class="empty-state">📭 No requests submitted yet</div>';
         return;
@@ -644,7 +382,7 @@ function loadMyRequests(kitchen) {
         const statusClass = status === "pending" ? "status-pending" : (status === "approved" ? "status-approved" : "status-rejected");
         const statusText = status === "pending" ? "⏳ Pending" : (status === "approved" ? "✅ Approved" : "❌ Rejected");
         
-        let itemsHtml = `<table class="approved-items-table"><thead><tr><th>Item</th><th>Requested</th><th>Status</th><th>Approved/Rejected</th></tr></thead><tbody>`;
+        let itemsHtml = `<table class="approved-items-table"><thead><tr><th>Item</th><th>Requested</th><th>Status</th><th>Approved/Rejected</th><tr></thead><tbody>`;
         
         req.items.forEach(item => {
             let itemStatus = "";
@@ -775,13 +513,25 @@ function generatePages() {
     kitchens.forEach(k => {
         const id = k.replace(/\s/g, '_');
         document.getElementById(`chefName_${id}`).addEventListener("input", () => { loadItems(k); loadMyRequests(k); });
-        document.getElementById(`qty_${id}`).addEventListener("input", function() {});
     });
     switchKitchen("Hot Kitchen");
 }
 
 generatePages();
-setInterval(() => { if(currentKitchen) loadMyRequests(currentKitchen); }, 3000);
+loadRequestsFromFirebase();
+
+// REAL-TIME LISTENER - Auto updates when admin approves
+db.collection("kitchen_requests").onSnapshot(() => {
+    console.log("🔄 Real-time update detected! Refreshing chef dashboard...");
+    loadRequestsFromFirebase();
+});
+
+// AUTO REFRESH every 3 seconds
+setInterval(() => {
+    if (currentKitchen) {
+        loadRequestsFromFirebase();
+    }
+}, 3000);
 </script>
 </body>
 </html>
