@@ -422,7 +422,6 @@ input:focus {
     border-bottom: 1px solid #f0f0f0;
 }
 
-/* Password Modal Styles */
 .modal {
     display: flex;
     position: fixed;
@@ -508,7 +507,6 @@ input:focus {
     background: #7f8c8d !important;
 }
 
-/* Item cards */
 .items-scroll-container {
     max-height: 500px;
     overflow-y: auto;
@@ -698,7 +696,7 @@ input:focus {
         </div>
         <div class="header-buttons">
             <button class="refresh-btn" onclick="manualRefresh()" title="Refresh Orders">🔄</button>
-            <button class="hard-reload-btn" onclick="hardReloadJSON()" title="Force Reload Items from JSON (Clear Cache)">📦 Reload Items</button>
+            <button class="hard-reload-btn" onclick="forceReloadItems()" title="Force Reload Items from JSON">📦 Reload Items</button>
             <button class="logout-btn" onclick="logout()" title="Logout">🚪</button>
         </div>
     </div>
@@ -717,7 +715,7 @@ input:focus {
 <script>
 const kitchenPasswords = {
     "Hot Kitchen": "hot123",
-    "Cold Kitchen": "cold123", 
+    "Cold Kitchen": "cold123",
     "Pastry / Bakery": "pastry123",
     "Butchery": "butchery123",
     "Beach House": "beach123",
@@ -725,122 +723,63 @@ const kitchenPasswords = {
     "Staff Kitchen": "staff123"
 };
 
+const kitchenToFileMap = {
+    "Hot Kitchen": "hot-kitchen.json",
+    "Cold Kitchen": "cold-kitchen.json",
+    "Pastry / Bakery": "pastry.json",
+    "Butchery": "butchery.json",
+    "Beach House": "beach-house.json",
+    "Nihon Kitchen": "nihon-kitchen.json",
+    "Staff Kitchen": "staff-kitchen.json"
+};
+
 let unlockedKitchens = {};
 let currentKitchen = null;
 let pendingKitchen = null;
-let allItems = null;
+let kitchenItemsCache = {};
 let kitchenData = {};
 let allRequests = [];
 let chefNames = {};
 let kitchens = ["Hot Kitchen", "Cold Kitchen", "Pastry / Bakery", "Butchery", "Beach House", "Nihon Kitchen", "Staff Kitchen"];
 
-let kitchenItemsCache = {};
 let selectedQuantities = {};
 let addedItemsStatus = {};
+let currentItemsList = [];
 
-// ============ CACHE-BUSTING JSON LOADER ============
-// Solution 1 & 4: Cache-busting with timestamp parameter
-async function loadItemsFromJSON(forceRefresh = false) {
-    return new Promise(async (resolve, reject) => {
-        if (allItems && !forceRefresh) {
-            console.log("Using cached items, skipping reload");
-            resolve(allItems);
-            return;
-        }
-        
-        showToast("📦 Loading inventory from JSON...");
-        
-        try {
-            // Add cache-busting timestamp to prevent browser cache
-            const cacheBuster = new Date().getTime();
-            const response = await fetch(`items.json?t=${cacheBuster}`);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            const data = await response.json();
-            
-            if (!data.items || !Array.isArray(data.items)) {
-                throw new Error("Invalid JSON format: missing 'items' array");
-            }
-            
-            allItems = data.items;
-            console.log(`✅ Loaded ${allItems.length} items from JSON at ${new Date().toLocaleTimeString()}`);
-            
-            // Rebuild kitchen cache
-            kitchens.forEach(kitchen => {
-                kitchenItemsCache[kitchen] = allItems.filter(i => i.section === kitchen);
-                console.log(`📁 ${kitchen}: ${kitchenItemsCache[kitchen].length} items`);
-            });
-            
-            showToast(`✅ ${allItems.length} items loaded!`);
-            resolve(allItems);
-        } catch (error) {
-            console.error("Failed to load items:", error);
-            showToast(`❌ Failed to load inventory: ${error.message}`);
-            reject(error);
-        }
-    });
-}
+async function loadItemsForKitchen(kitchen, forceRefresh = false) {
+    if (kitchenItemsCache[kitchen] && !forceRefresh) {
+        return kitchenItemsCache[kitchen];
+    }
 
-// Solution 2: Force reload JSON (clear cached items and reload)
-async function forceReloadItems() {
-    showToast("🔄 Force reloading items from JSON...");
+    const fileName = kitchenToFileMap[kitchen];
+    if (!fileName) return [];
+
+    const jsonPath = `items/${fileName}`;
+    const cacheBuster = new Date().getTime();
+    const url = `${jsonPath}?t=${cacheBuster}`;
+
     try {
-        // Clear the cached items
-        allItems = null;
-        kitchenItemsCache = {};
-        
-        // Reload with cache busting (forceRefresh = true)
-        await loadItemsFromJSON(true);
-        
-        // Refresh current kitchen view if any kitchen is selected
-        if (currentKitchen) {
-            await renderItemsList(currentKitchen);
-            renderCart(currentKitchen);
-            showToast(`✅ Reloaded ${allItems.length} items for ${currentKitchen}`);
-        } else {
-            showToast(`✅ Reloaded ${allItems.length} items total`);
-        }
-    } catch (error) {
-        console.error("Force reload failed:", error);
-        showToast("❌ Failed to reload items. Check items.json file.");
-    }
-}
+        const response = await fetch(url);
+        if (!response.ok) return [];
 
-// Solution 5: Hard reload entire page with cache-buster
-function hardReloadJSON() {
-    if (confirm("Force reload items from JSON file?\nThis will clear the cached items and reload fresh data from items.json")) {
-        forceReloadItems();
-    }
-}
-
-// Solution 3: Full page reload with cache-buster parameter
-function fullPageHardReload() {
-    if (confirm("Hard reload entire page?\nThis will clear all caches and reload the page completely.")) {
-        const url = new URL(window.location.href);
-        url.searchParams.set('reload', Date.now());
-        window.location.href = url.toString();
-    }
-}
-
-// Add a hidden function to check current JSON data (for debugging)
-window.checkJSONData = async function() {
-    try {
-        const cacheBuster = Date.now();
-        const response = await fetch(`items.json?t=${cacheBuster}`);
         const data = await response.json();
-        console.log("Current items.json content:", data);
-        showToast(`JSON has ${data.items?.length || 0} items`);
-        return data;
-    } catch(e) {
-        console.error(e);
-        showToast("Error reading JSON");
-    }
-};
+        let itemsArray = Array.isArray(data) ? data : (data.items || []);
 
-function getItemsForKitchen(kitchen) { 
+        itemsArray = itemsArray.map(item => ({
+            ...item,
+            section: item.section || kitchen
+        }));
+
+        kitchenItemsCache[kitchen] = itemsArray;
+        return itemsArray;
+
+    } catch (error) {
+        console.error(`Error loading ${jsonPath}:`, error);
+        return [];
+    }
+}
+
+function getItemsForKitchen(kitchen) {
     return kitchenItemsCache[kitchen] || [];
 }
 
@@ -912,7 +851,6 @@ function showKitchenPasswordModal(kitchen) {
         </div>
     `;
     document.body.appendChild(modalDiv);
-    
     document.getElementById("verifyPassBtn").onclick = () => verifyKitchenPassword();
     document.getElementById("closeModalBtn").onclick = () => closePasswordModal();
     document.getElementById("kitchenPasswordInput").focus();
@@ -969,64 +907,83 @@ async function manualRefresh() {
     }
 }
 
-async function renderItemsList(kitchen) {
+async function forceReloadItems() {
+    showToast("🔄 Force reloading all kitchen items...");
+    for (const kitchen of kitchens) {
+        kitchenItemsCache[kitchen] = null;
+    }
+    if (currentKitchen) {
+        await renderItemsList(currentKitchen);
+        showToast(`✅ Reloaded items for ${currentKitchen}`);
+    } else {
+        showToast("✅ Cache cleared. Select a kitchen to reload.");
+    }
+}
+
+// Search by first character
+function filterItemsByFirstChar(kitchen, searchChar) {
     const kitchenId = kitchen.replace(/\s/g, '_').replace(/\//g, '_');
-    const container = document.getElementById(`itemsListContainer_${kitchenId}`);
-    if (!container) return;
-    
-    const chefName = chefNames[kitchen];
-    if(!chefName) {
-        container.innerHTML = '<div class="empty-state">⚠️ Enter chef name to see items</div>';
+    const displayDiv = document.getElementById(`itemsDisplay_${kitchenId}`);
+    if (!displayDiv) return;
+
+    let filteredItems = currentItemsList;
+    if (searchChar && searchChar.trim().length > 0) {
+        const lowerChar = searchChar.trim().toLowerCase();
+        filteredItems = currentItemsList.filter(item => {
+            const itemName = (item.name || "").toLowerCase();
+            const itemCode = (item.code || "").toLowerCase();
+            return itemName.startsWith(lowerChar) || itemCode.startsWith(lowerChar);
+        });
+    }
+
+    if (!filteredItems || filteredItems.length === 0) {
+        displayDiv.innerHTML = `<div class="empty-state">🔍 No items starting with "${searchChar}"</div>`;
         return;
     }
-    
-    if (!allItems) await loadItemsFromJSON(false);
-    
-    let items = getItemsForKitchen(kitchen);
-    if (!items || items.length === 0) {
-        container.innerHTML = `<div class="empty-state">📭 No items for ${kitchen}</div>`;
-        return;
-    }
-    
+
     if (!selectedQuantities[kitchen]) selectedQuantities[kitchen] = {};
     if (!addedItemsStatus[kitchen]) addedItemsStatus[kitchen] = {};
-    
-    const sortedItems = [...items].sort((a,b) => a.name.localeCompare(b.name));
+
+    const sortedItems = [...filteredItems].sort((a,b) => (a.name || "").localeCompare(b.name || ""));
     let html = `<div class="items-scroll-container"><div class="items-grid">`;
-    
+
     sortedItems.forEach(item => {
         const currentQty = selectedQuantities[kitchen][item.code] || 0;
         const isSelected = addedItemsStatus[kitchen][item.code] || false;
         const selectedClass = isSelected ? 'selected' : '';
-        const safeCode = item.code.replace(/[^a-zA-Z0-9]/g, '_');
-        
+        const safeCode = (item.code || "").replace(/[^a-zA-Z0-9]/g, '_');
+        const itemName = item.name || "Unknown";
+        const itemUnit = item.unit || "pcs";
+        const maxLimit = item.maxLimit || 99;
+
         html += `
-            <div class="item-card ${selectedClass}" data-code="${item.code}" id="itemCard_${kitchenId}_${safeCode}">
+            <div class="item-card ${selectedClass}" id="itemCard_${kitchenId}_${safeCode}">
                 <div class="item-main-row">
                     <div class="item-info">
-                        <div class="item-name">${escapeHtml(item.name)}</div>
-                        <div class="item-code">${item.code}</div>
+                        <div class="item-name">${escapeHtml(itemName)}</div>
+                        <div class="item-code">${item.code || "N/A"}</div>
                     </div>
                     <div class="item-meta">
-                        <span class="item-unit">${item.unit}</span>
-                        <div class="item-max">max ${item.maxLimit}</div>
+                        <span class="item-unit">${itemUnit}</span>
+                        <div class="item-max">max ${maxLimit}</div>
                     </div>
                     <div class="item-actions">
                         <div class="qty-picker">
-                            <button class="qty-btn" data-step="-0.5" data-code="${item.code}" data-max="${item.maxLimit}">−</button>
+                            <button class="qty-btn" data-step="-0.5" data-code="${item.code}" data-max="${maxLimit}">−</button>
                             <span class="qty-value" id="qtySpan_${kitchenId}_${safeCode}">${currentQty.toFixed(1)}</span>
-                            <button class="qty-btn" data-step="0.5" data-code="${item.code}" data-max="${item.maxLimit}">+</button>
+                            <button class="qty-btn" data-step="0.5" data-code="${item.code}" data-max="${maxLimit}">+</button>
                         </div>
-                        <button class="add-item-btn" data-code="${item.code}" data-name="${escapeHtml(item.name)}" data-unit="${item.unit}" data-max="${item.maxLimit}">Add</button>
+                        <button class="add-item-btn" data-code="${item.code}" data-name="${escapeHtml(itemName)}" data-unit="${itemUnit}" data-max="${maxLimit}">Add</button>
                     </div>
                 </div>
             </div>
         `;
     });
-    html += `</div><div class="scroll-info">📜 ${sortedItems.length} items • Use +/− (0.5 steps) → Add</div></div>`;
-    container.innerHTML = html;
-    
-    container.querySelectorAll('.qty-btn').forEach(btn => {
+    html += `</div><div class="scroll-info">📜 Showing ${sortedItems.length} of ${currentItemsList.length} items starting with "${searchChar || 'all'}"</div></div>`;
+    displayDiv.innerHTML = html;
+
+    // Reattach event listeners
+    displayDiv.querySelectorAll('.qty-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const step = parseFloat(btn.dataset.step);
@@ -1035,7 +992,7 @@ async function renderItemsList(kitchen) {
             changeQuantity(kitchen, code, step, maxLimit);
         });
     });
-    container.querySelectorAll('.add-item-btn').forEach(btn => {
+    displayDiv.querySelectorAll('.add-item-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const code = btn.dataset.code;
@@ -1047,6 +1004,44 @@ async function renderItemsList(kitchen) {
     });
 }
 
+async function renderItemsList(kitchen) {
+    const kitchenId = kitchen.replace(/\s/g, '_').replace(/\//g, '_');
+    const container = document.getElementById(`itemsListContainer_${kitchenId}`);
+    if (!container) return;
+
+    const chefName = chefNames[kitchen];
+    if(!chefName) {
+        container.innerHTML = '<div class="empty-state">⚠️ Enter chef name to see items</div>';
+        return;
+    }
+
+    let items = await loadItemsForKitchen(kitchen, false);
+    if (!items || items.length === 0) {
+        container.innerHTML = `<div class="empty-state">📭 No items found for ${kitchen}</div>`;
+        return;
+    }
+
+    currentItemsList = items;
+
+    let html = `
+        <div class="input-group" style="margin-bottom:12px;">
+            <label>🔍 Search by first character</label>
+            <input type="text" id="searchInput_${kitchenId}" placeholder="Type a letter (e.g., 'T' for items starting with T)" maxlength="1" autocomplete="off" style="text-transform:uppercase;">
+        </div>
+        <div id="itemsDisplay_${kitchenId}"></div>
+    `;
+    container.innerHTML = html;
+
+    // Initial display - all items
+    filterItemsByFirstChar(kitchen, "");
+
+    const searchInput = document.getElementById(`searchInput_${kitchenId}`);
+    searchInput.addEventListener('input', (e) => {
+        const val = e.target.value;
+        filterItemsByFirstChar(kitchen, val);
+    });
+}
+
 function changeQuantity(kitchen, code, delta, maxLimit) {
     if (!selectedQuantities[kitchen]) selectedQuantities[kitchen] = {};
     let current = selectedQuantities[kitchen][code] || 0;
@@ -1054,9 +1049,9 @@ function changeQuantity(kitchen, code, delta, maxLimit) {
     if (newQty < 0) newQty = 0;
     if (newQty > maxLimit) newQty = maxLimit;
     selectedQuantities[kitchen][code] = newQty;
-    
+
     const kitchenId = kitchen.replace(/\s/g, '_').replace(/\//g, '_');
-    const safeCode = code.replace(/[^a-zA-Z0-9]/g, '_');
+    const safeCode = (code || "").replace(/[^a-zA-Z0-9]/g, '_');
     const span = document.getElementById(`qtySpan_${kitchenId}_${safeCode}`);
     if (span) span.innerText = newQty.toFixed(1);
 }
@@ -1064,43 +1059,44 @@ function changeQuantity(kitchen, code, delta, maxLimit) {
 function addItemWithQuantity(kitchen, code, itemName, unit, maxLimit) {
     const chefName = chefNames[kitchen];
     if(!chefName) { showToast("⚠️ Enter chef name first"); return; }
-    
+
     const qty = selectedQuantities[kitchen]?.[code] || 0;
     if (qty <= 0) { showToast(`⚠️ Set quantity > 0 for ${itemName}`); return; }
-    
-    const item = getItemsForKitchen(kitchen).find(i => i.code === code);
+
+    const items = getItemsForKitchen(kitchen);
+    const item = items.find(i => i.code === code);
     if(!item) return;
-    
+
     const existing = kitchenData[kitchen].cart.find(i => i.code === code);
     let newTotal = (existing ? existing.qty : 0) + qty;
-    if (newTotal > item.maxLimit) {
-        const remaining = item.maxLimit - (existing ? existing.qty : 0);
-        showToast(`⚠️ Max ${item.maxLimit} ${item.unit}. Only ${remaining.toFixed(1)} left`);
+    if (newTotal > (item.maxLimit || maxLimit)) {
+        const remaining = (item.maxLimit || maxLimit) - (existing ? existing.qty : 0);
+        showToast(`⚠️ Max ${item.maxLimit || maxLimit} ${item.unit || unit}. Only ${remaining.toFixed(1)} left`);
         return;
     }
-    
+
     if (existing) {
         existing.qty += qty;
         showToast(`✓ Added ${qty.toFixed(1)} ${item.name}`);
     } else {
         kitchenData[kitchen].cart.push({
-            code: item.code, name: item.name, unit: item.unit, 
-            qty: qty, maxLimit: item.maxLimit
+            code: item.code, name: item.name, unit: item.unit || unit,
+            qty: qty, maxLimit: item.maxLimit || maxLimit
         });
         showToast(`✓ Added ${qty.toFixed(1)} ${item.name}`);
     }
-    
+
     addedItemsStatus[kitchen][code] = true;
     selectedQuantities[kitchen][code] = 0;
-    
+
     const kitchenId = kitchen.replace(/\s/g, '_').replace(/\//g, '_');
-    const safeCode = code.replace(/[^a-zA-Z0-9]/g, '_');
+    const safeCode = (code || "").replace(/[^a-zA-Z0-9]/g, '_');
     const span = document.getElementById(`qtySpan_${kitchenId}_${safeCode}`);
     if (span) span.innerText = "0.0";
-    
+
     const card = document.getElementById(`itemCard_${kitchenId}_${safeCode}`);
     if (card) card.classList.add('selected');
-    
+
     renderCart(kitchen);
     saveCart();
 }
@@ -1111,7 +1107,7 @@ function renderCart(kitchen) {
     const totalQty = cart.reduce((sum, i) => sum + i.qty, 0);
     document.getElementById(`totalItems_${kitchenId}`).innerText = totalQty.toFixed(1);
     document.getElementById(`lineCount_${kitchenId}`).innerText = cart.length;
-    
+
     const desktopBody = document.getElementById(`cartTableDesktop_${kitchenId}`);
     if(desktopBody) {
         if(cart.length === 0) {
@@ -1132,7 +1128,7 @@ function renderCart(kitchen) {
             });
         }
     }
-    
+
     const mobileContainer = document.getElementById(`cartMobile_${kitchenId}`);
     if(mobileContainer) {
         if(cart.length === 0) {
@@ -1159,7 +1155,7 @@ function removeItem(kitchen, index) {
     const removed = kitchenData[kitchen].cart[index];
     if (removed) {
         const kitchenId = kitchen.replace(/\s/g, '_').replace(/\//g, '_');
-        const safeCode = removed.code.replace(/[^a-zA-Z0-9]/g, '_');
+        const safeCode = (removed.code || "").replace(/[^a-zA-Z0-9]/g, '_');
         const stillExists = kitchenData[kitchen].cart.some((it, i) => i !== index && it.code === removed.code);
         if (!stillExists && addedItemsStatus[kitchen]) {
             addedItemsStatus[kitchen][removed.code] = false;
@@ -1180,7 +1176,7 @@ function clearCart(kitchen) {
         if (addedItemsStatus[kitchen]) {
             Object.keys(addedItemsStatus[kitchen]).forEach(code => {
                 addedItemsStatus[kitchen][code] = false;
-                const safeCode = code.replace(/[^a-zA-Z0-9]/g, '_');
+                const safeCode = (code || "").replace(/[^a-zA-Z0-9]/g, '_');
                 const card = document.getElementById(`itemCard_${kitchenId}_${safeCode}`);
                 if (card) card.classList.remove('selected');
             });
@@ -1196,7 +1192,7 @@ async function submitRequest(kitchen) {
     const cart = kitchenData[kitchen].cart;
     if(!chefName) { showToast("⚠️ Enter chef name"); return; }
     if(cart.length === 0) { showToast("No items to submit"); return; }
-    
+
     const newRequest = {
         requestId: "REQ-" + Date.now().toString().slice(-6),
         chefName: chefName,
@@ -1209,14 +1205,14 @@ async function submitRequest(kitchen) {
         submittedAt: new Date().toLocaleString(),
         timestamp: Date.now()
     };
-    
+
     await saveRequestToFirebase(newRequest);
     kitchenData[kitchen].cart = [];
     const kitchenId = kitchen.replace(/\s/g, '_').replace(/\//g, '_');
     if (addedItemsStatus[kitchen]) {
         Object.keys(addedItemsStatus[kitchen]).forEach(code => {
             addedItemsStatus[kitchen][code] = false;
-            const safeCode = code.replace(/[^a-zA-Z0-9]/g, '_');
+            const safeCode = (code || "").replace(/[^a-zA-Z0-9]/g, '_');
             const card = document.getElementById(`itemCard_${kitchenId}_${safeCode}`);
             if (card) card.classList.remove('selected');
         });
@@ -1243,18 +1239,18 @@ function loadMyRequests(kitchen) {
     const chefName = chefNames[kitchen];
     const container = document.getElementById(`myRequestsDesktop_${kitchenId}`);
     if (!container) return;
-    
+
     if(!chefName) {
         container.innerHTML = '<div class="empty-state">Enter chef name to see requests</div>';
         return;
     }
-    
+
     const myRequests = allRequests.filter(r => r.chefName === chefName && r.section === kitchen);
     if (myRequests.length === 0) {
         container.innerHTML = '<div class="empty-state">📭 No requests yet</div>';
         return;
     }
-    
+
     container.innerHTML = "";
     [...myRequests].reverse().forEach(req => {
         const status = getOverallStatus(req.items);
@@ -1262,21 +1258,37 @@ function loadMyRequests(kitchen) {
         if (status === "approved") { statusClass = "status-approved"; statusText = "✅ Fully Approved"; }
         else if (status === "rejected") { statusClass = "status-rejected"; statusText = "❌ Rejected"; }
         else if (status === "partial") { statusClass = "status-partial"; statusText = "⚠️ Partially Approved"; }
-        
-        let itemsHtml = `<table class="approved-items-table"><thead><tr><th>Item</th><th>Requested</th><th>Status</th><th>Result</th></tr></thead><tbody>`;
+
+        let itemsHtml = `<table class="approved-items-table"><thead><tr><th>Item</th><th>Requested</th><th>Approved Qty</th><th>Status</th></tr></thead><tbody>`;
+
         req.items.forEach(item => {
-            let resultText = "";
-            if(item.status === "approved") resultText = `${item.approvedQty} ${item.unit} approved`;
-            else if(item.status === "rejected") resultText = item.rejectionReason || "Rejected";
-            else resultText = "Waiting...";
-            itemsHtml += `<tr><td><strong>${escapeHtml(item.name)}</strong><br><small>${item.code}</small></td>
-                          <td>${item.originalQty.toFixed(1)} ${item.unit}</div>
-                          <td>${item.status === "approved" ? "✅" : item.status === "rejected" ? "❌" : "⏳"} ${item.status === "approved" ? "Approved" : item.status === "rejected" ? "Rejected" : "Pending"}</div>
-                          <td>${resultText}</div>
-                    </tr>`;
+            if(item.status === "approved") {
+                const adminName = item.approvedBy ? ` (by: ${item.approvedBy})` : "";
+                itemsHtml += `<tr style="background:#e8f5e9;">
+                    <td><strong>${escapeHtml(item.name)}</strong><br><small>${item.code}</small></td>
+                    <td>${item.originalQty.toFixed(1)} ${item.unit}</td>
+                    <td><span style="color:#27ae60;">${item.approvedQty} ${item.unit}${adminName}</span></td>
+                    <td><span style="color:#27ae60;">✅ Approved</span></td>
+                </tr>`;
+            } else if(item.status === "rejected") {
+                const adminName = item.rejectedBy ? ` (by: ${item.rejectedBy})` : "";
+                itemsHtml += `<tr style="background:#fee2e2;">
+                    <td><strong>${escapeHtml(item.name)}</strong><br><small>${item.code}</small></td>
+                    <td>${item.originalQty.toFixed(1)} ${item.unit}</td>
+                    <td><span style="color:#e74c3c;">0 ${item.unit}${adminName}</span></td>
+                    <td><span style="color:#e74c3c;">❌ Rejected</span><br><small>${escapeHtml(item.rejectionReason || '')}</small></td>
+                </tr>`;
+            } else {
+                itemsHtml += `<tr>
+                    <td><strong>${escapeHtml(item.name)}</strong><br><small>${item.code}</small></td>
+                    <td>${item.originalQty.toFixed(1)} ${item.unit}</td>
+                    <td><span style="color:#f39c12;">Waiting...</span></td>
+                    <td><span style="color:#f39c12;">⏳ Pending</span></td>
+                </tr>`;
+            }
         });
         itemsHtml += `</tbody></table>`;
-        
+
         container.innerHTML += `
             <div style="border-left:4px solid ${status === 'approved' ? '#27ae60' : status === 'rejected' ? '#e74c3c' : status === 'partial' ? '#8e44ad' : '#f39c12'}; border-radius:12px; padding:14px; margin-bottom:16px; background:#fff;">
                 <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
@@ -1341,11 +1353,10 @@ async function selectKitchen(kitchen) {
     const pageId = `page_${kitchen.replace(/\s/g, '_').replace(/\//g, '_')}`;
     const target = document.getElementById(pageId);
     if(target) target.classList.add('active-page');
-    
+
     const chefInput = document.getElementById(`chefName_${kitchen.replace(/\s/g, '_').replace(/\//g, '_')}`);
     if(chefInput) chefInput.value = chefNames[kitchen] || "";
-    
-    await loadItemsFromJSON(false);
+
     await renderItemsList(kitchen);
     renderCart(kitchen);
     loadMyRequests(kitchen);
@@ -1372,7 +1383,7 @@ function createKitchenPage(kitchen) {
                 </div>
             </div>
             <div class="card">
-                <h3>📦 ${kitchen} Items</h3>
+                <h3>📦 ${kitchen} Items <span style="font-size:11px; font-weight:normal;">(Search by first character)</span></h3>
                 <div id="itemsListContainer_${id}"></div>
             </div>
             <div class="card">
@@ -1387,7 +1398,7 @@ function createKitchenPage(kitchen) {
                 </div>
             </div>
             <div class="card">
-                <h3>📜 My Requests</h3>
+                <h3>📜 My Requests <span style="font-size:11px; font-weight:normal;">(Shows admin who approved)</span></h3>
                 <div id="myRequestsDesktop_${id}"></div>
             </div>
         </div>
@@ -1406,14 +1417,9 @@ function generatePages() {
 }
 
 generatePages();
-loadItemsFromJSON(false).then(() => {
-    loadRequestsFromFirebase();
-    db.collection("kitchen_requests").onSnapshot(() => loadRequestsFromFirebase());
-    setInterval(() => { if(currentKitchen) loadRequestsFromFirebase(); }, 4000);
-});
-
-// Expose force reload function to global scope for debugging
-window.forceReloadItems = forceReloadItems;
+loadRequestsFromFirebase();
+db.collection("kitchen_requests").onSnapshot(() => loadRequestsFromFirebase());
+setInterval(() => { if(currentKitchen) loadRequestsFromFirebase(); }, 4000);
 </script>
 </body>
 </html>
